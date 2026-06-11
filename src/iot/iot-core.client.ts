@@ -36,7 +36,7 @@ export class MockIotCoreClient implements IotCoreClient {
       }
 
       const patch = this.patchFor(cmd);
-      logger.debug('iot.appliance.updating', {
+      logger.info('iot.appliance.updating', {
         commandId: cmd.commandId,
         applianceId: id,
         applianceName: ap.name,
@@ -47,7 +47,7 @@ export class MockIotCoreClient implements IotCoreClient {
 
       const updated = (await this.repo.updateApplianceState(id, patch)) ?? ap;
 
-      logger.debug('iot.appliance.updated', {
+      logger.info('iot.appliance.updated', {
         commandId: cmd.commandId,
         applianceId: id,
         applianceName: updated.name,
