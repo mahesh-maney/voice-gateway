@@ -1,0 +1,28 @@
+{
+  "version": "1.0",
+  "session": {
+    "user": {
+      "userId": "amzn1.ask.account.RAVI",
+      "accessToken": "demo-token-ravi"
+    }
+  },
+  "context": {
+    "System": {
+      "device": { "deviceId": "amzn1.ask.device.ECHO1" },
+      "user": { "userId": "amzn1.ask.account.RAVI", "accessToken": "demo-token-ravi" }
+    }
+  },
+  "request": {
+    "type": "IntentRequest",
+    "requestId": "amzn1.echo-api.request.0001",
+    "locale": "en-IN",
+    "timestamp": "2026-06-11T09:00:00Z",
+    "intent": {
+      "name": "TurnOnIntent",
+      "slots": {
+        "Appliance": { "name": "Appliance", "value": "AC" },
+        "Scene": { "name": "Scene", "value": "master bedroom" }
+      }
+    }
+  }
+}

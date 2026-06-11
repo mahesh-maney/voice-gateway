@@ -1,0 +1,134 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "my home",
+      "types": [
+        {
+          "name": "ApplianceType",
+          "values": [
+            { "name": { "value": "AC", "synonyms": ["air conditioner", "air con", "cooler"] } },
+            { "name": { "value": "light", "synonyms": ["lights", "lamp", "bulb"] } },
+            { "name": { "value": "fan" } },
+            { "name": { "value": "TV", "synonyms": ["television"] } },
+            { "name": { "value": "geyser", "synonyms": ["water heater"] } },
+            { "name": { "value": "curtains", "synonyms": ["blinds"] } },
+            { "name": { "value": "exhaust fan" } },
+            { "name": { "value": "microwave" } },
+            { "name": { "value": "speaker" } },
+            { "name": { "value": "projector" } }
+          ]
+        },
+        {
+          "name": "SceneType",
+          "values": [
+            { "name": { "value": "master bedroom" } },
+            { "name": { "value": "living room" } },
+            { "name": { "value": "kitchen" } },
+            { "name": { "value": "cabin" } },
+            { "name": { "value": "conference hall" } }
+          ]
+        }
+      ],
+      "intents": [
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        {
+          "name": "TurnOnIntent",
+          "slots": [
+            { "name": "Appliance", "type": "ApplianceType" },
+            { "name": "Scene", "type": "SceneType" }
+          ],
+          "samples": [
+            "turn on the {Appliance} at {Scene}",
+            "turn on the {Appliance} in the {Scene}",
+            "switch on the {Appliance} in {Scene}",
+            "{Appliance} on in the {Scene}"
+          ]
+        },
+        {
+          "name": "TurnOffIntent",
+          "slots": [
+            { "name": "Appliance", "type": "ApplianceType" },
+            { "name": "Scene", "type": "SceneType" }
+          ],
+          "samples": [
+            "turn off the {Appliance} at {Scene}",
+            "turn off the {Appliance} in the {Scene}",
+            "switch off the {Appliance} in {Scene}"
+          ]
+        },
+        {
+          "name": "SetTemperatureIntent",
+          "slots": [
+            { "name": "Appliance", "type": "ApplianceType" },
+            { "name": "Scene", "type": "SceneType" },
+            { "name": "Temperature", "type": "AMAZON.NUMBER" }
+          ],
+          "samples": [
+            "set the {Appliance} to {Temperature} degrees in the {Scene}",
+            "set the {Scene} {Appliance} to {Temperature}",
+            "make the {Scene} {Appliance} {Temperature} degrees"
+          ]
+        },
+        {
+          "name": "SetBrightnessIntent",
+          "slots": [
+            { "name": "Appliance", "type": "ApplianceType" },
+            { "name": "Scene", "type": "SceneType" },
+            { "name": "Brightness", "type": "AMAZON.NUMBER" }
+          ],
+          "samples": [
+            "set the {Appliance} to {Brightness} percent in the {Scene}",
+            "dim the {Scene} {Appliance} to {Brightness}"
+          ]
+        },
+        {
+          "name": "SetFanSpeedIntent",
+          "slots": [
+            { "name": "Appliance", "type": "ApplianceType" },
+            { "name": "Scene", "type": "SceneType" },
+            { "name": "FanSpeed", "type": "AMAZON.NUMBER" }
+          ],
+          "samples": [
+            "set the {Appliance} to speed {FanSpeed} in the {Scene}",
+            "set the {Scene} {Appliance} speed to {FanSpeed}"
+          ]
+        },
+        {
+          "name": "OpenIntent",
+          "slots": [
+            { "name": "Appliance", "type": "ApplianceType" },
+            { "name": "Scene", "type": "SceneType" }
+          ],
+          "samples": [
+            "open the {Appliance} in the {Scene}",
+            "open the {Scene} {Appliance}"
+          ]
+        },
+        {
+          "name": "CloseIntent",
+          "slots": [
+            { "name": "Appliance", "type": "ApplianceType" },
+            { "name": "Scene", "type": "SceneType" }
+          ],
+          "samples": [
+            "close the {Appliance} in the {Scene}",
+            "close the {Scene} {Appliance}"
+          ]
+        },
+        {
+          "name": "QueryStateIntent",
+          "slots": [
+            { "name": "Appliance", "type": "ApplianceType" },
+            { "name": "Scene", "type": "SceneType" }
+          ],
+          "samples": [
+            "is the {Appliance} on in the {Scene}",
+            "what is the state of the {Scene} {Appliance}"
+          ]
+        }
+      ]
+    }
+  }
+}
