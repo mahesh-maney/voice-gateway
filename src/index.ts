@@ -1,7 +1,7 @@
 import { buildGateway } from './core/composition.js';
 import { buildApp } from './http/app.js';
 import { config } from './config.js';
-import { logger } from './util/logger.js';
+import { logger, closeLogs } from './util/logger.js';
 
 const { gateway, repo } = buildGateway();
 const app = buildApp(gateway, repo);
@@ -28,6 +28,7 @@ async function shutdown(signal: string): Promise<void> {
   logger.info('voice-gateway.shutting-down', { signal });
   server.close(async () => {
     await repo.close?.();
+    await closeLogs();
     process.exit(0);
   });
 }
