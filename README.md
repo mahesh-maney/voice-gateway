@@ -129,6 +129,104 @@ alexa-skill/       interaction-model.json (intents, slots, utterances)
 
 ---
 
+## End-to-end flow — from Alexa device to IoT core and back
+
+```
+YOU SPEAK
+"Alexa, ask my home to turn on the AC in master bedroom"
+        │
+        ▼
+┌─────────────────────────────────────────────────────┐
+│  ALEXA DEVICE  (Echo / phone)                       │
+│  - Wakes on "Alexa"                                 │
+│  - Records your voice                               │
+│  - Sends audio to Amazon's cloud (ASR + NLU)        │
+└──────────────────┬──────────────────────────────────┘
+                   │  Amazon matches speech to intent
+                   │  "TurnOnIntent"
+                   │  slots: Appliance=AC, Scene=master bedroom
+                   ▼
+┌─────────────────────────────────────────────────────┐
+│  AMAZON ALEXA CLOUD                                 │
+│  - Validates the skill endpoint                     │
+│  - Builds an IntentRequest JSON payload             │
+│  - Signs it with RSA certificate                    │
+│  - POSTs to your endpoint                           │
+└──────────────────┬──────────────────────────────────┘
+                   │  POST /voice/alexa
+                   │  { intent: TurnOnIntent,
+                   │    slots: { AC, master bedroom },
+                   │    accessToken: "demo-token-ravi" }
+                   ▼
+┌─────────────────────────────────────────────────────┐
+│  VOICE GATEWAY  (this service)                      │
+│                                                     │
+│  1. alexaVerify    → validates RSA signature        │
+│  2. validateAlexa  → Zod schema check               │
+│  3. AlexaAdapter   → reads intent + slots           │
+│  4. IdentityResolver → token → userId "user_42"     │
+│     [LOG] identity.resolved                         │
+│  5. CanonicalCommand built                          │
+│     [LOG] command.parsed  action=appliance.set_power│
+│  6. TargetResolver → "AC"+"master bedroom"          │
+│                    → applianceId "ac_mbr"           │
+│     [LOG] command.resolved  applianceIds=["ac_mbr"] │
+│  7. Dispatcher → idempotency check (commandId)      │
+│     [LOG] dispatcher.iot.dispatching                │
+│  8. ResilientIotCoreClient                          │
+│     → circuit breaker check                        │
+│     → retry wrapper                                │
+│     → timeout wrapper                              │
+└──────────────────┬──────────────────────────────────┘
+                   │  execute(CanonicalCommand)
+                   ▼
+┌─────────────────────────────────────────────────────┐
+│  IoT CORE CLIENT  (mock today / real tomorrow)      │
+│  - Receives CanonicalCommand                        │
+│  - Looks up appliance "ac_mbr"                      │
+│  [LOG] iot.appliance.updating  stateBefore={off}    │
+│  - Applies patch { power: "on" }                    │
+│  [LOG] iot.appliance.updated   stateAfter={on}      │
+│  - Returns CanonicalResult                          │
+│    { status:"success",                              │
+│      summary:"Turned on the air conditioner..." }   │
+└──────────────────┬──────────────────────────────────┘
+                   │  CanonicalResult
+                   ▼
+┌─────────────────────────────────────────────────────┐
+│  VOICE GATEWAY  (response path)                     │
+│  [LOG] dispatcher.iot.dispatched  status=success    │
+│  [LOG] command.executed                             │
+│  AlexaAdapter.toResponse()                          │
+│  → "Okay. Turned on the air conditioner in          │
+│     the master bedroom."                            │
+│  → wraps in <speak>...</speak> SSML                 │
+│  → returns AlexaResponse JSON                       │
+└──────────────────┬──────────────────────────────────┘
+                   │  HTTP 200
+                   │  { outputSpeech: { ssml: "<speak>Okay..</speak>" } }
+                   ▼
+┌─────────────────────────────────────────────────────┐
+│  AMAZON ALEXA CLOUD                                 │
+│  - Receives the SSML response                       │
+│  - Converts text to speech (TTS)                    │
+│  - Streams audio back to your Echo device           │
+└──────────────────┬──────────────────────────────────┘
+                   │
+                   ▼
+        ALEXA SPEAKS BACK
+  "Okay. Turned on the air conditioner
+   in the master bedroom."
+```
+
+The `iot.appliance.updating` log captures `stateBefore` and the patch being applied.
+`iot.appliance.updated` captures `stateAfter` — together they are the proof that the
+IoT core received and applied the command. When you swap in a real IoT client, these
+same log lines bracket your real device call. All 11 log lines per command are written
+to `logs/combined.log`.
+
+---
+
 ## How a request flows (the pipeline)
 
 ```
