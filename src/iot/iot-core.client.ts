@@ -12,27 +12,67 @@ import { joinSpoken } from '../util/text.js';
  * The point: the core only ever sees a CanonicalCommand — never an Alexa request.
  */
 import type { IotCoreClient } from './iot-core.interface.js';
+import { logger } from '../util/logger.js';
 
 export class MockIotCoreClient implements IotCoreClient {
   constructor(private readonly repo: Repository) {}
 
   async execute(cmd: CanonicalCommand): Promise<CanonicalResult> {
+    logger.debug('iot.execute.start', {
+      commandId: cmd.commandId,
+      action: cmd.action,
+      applianceIds: cmd.target.applianceIds,
+      parameters: cmd.parameters,
+    });
+
     const outcomes: ApplianceOutcome[] = [];
 
     for (const id of cmd.target.applianceIds) {
       const ap = await this.repo.getAppliance(id);
       if (!ap) {
+        logger.warn('iot.appliance.not-found', { commandId: cmd.commandId, applianceId: id });
         outcomes.push({ applianceId: id, applianceName: id, error: { code: 'NOT_FOUND', message: 'Appliance vanished' } });
         continue;
       }
+
       const patch = this.patchFor(cmd);
+      logger.debug('iot.appliance.updating', {
+        commandId: cmd.commandId,
+        applianceId: id,
+        applianceName: ap.name,
+        applianceType: ap.type,
+        stateBefore: ap.state,
+        patch,
+      });
+
       const updated = (await this.repo.updateApplianceState(id, patch)) ?? ap;
+
+      logger.debug('iot.appliance.updated', {
+        commandId: cmd.commandId,
+        applianceId: id,
+        applianceName: updated.name,
+        stateAfter: updated.state,
+      });
+
       outcomes.push({ applianceId: id, applianceName: updated.name, state: updated.state });
     }
 
     const failed = outcomes.filter((o) => o.error).length;
     const status: CanonicalResult['status'] =
       failed === 0 ? 'success' : failed === outcomes.length ? 'failure' : 'partial';
+
+    logger.info('iot.execute.complete', {
+      commandId: cmd.commandId,
+      action: cmd.action,
+      status,
+      successCount: outcomes.length - failed,
+      failureCount: failed,
+      outcomes: outcomes.map(o => ({
+        applianceId: o.applianceId,
+        applianceName: o.applianceName,
+        error: o.error,
+      })),
+    });
 
     return {
       commandId: cmd.commandId,

@@ -22,14 +22,20 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
       method: req.method,
       path: req.path,
       ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      contentLength: req.headers['content-length'],
+      correlationId: req.headers['x-correlation-id'],
     });
 
     res.on('finish', () => {
-      logger.info('http.response', {
+      const durationMs = Date.now() - start;
+      const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
+      logger[level]('http.response', {
         method: req.method,
         path: req.path,
         status: res.statusCode,
-        durationMs: Date.now() - start,
+        durationMs,
+        contentLength: res.getHeader('content-length'),
       });
     });
 

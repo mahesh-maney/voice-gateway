@@ -150,9 +150,17 @@ export class ResilientIotCoreClient implements IotCoreClient {
   }
 
   execute(cmd: CanonicalCommand): Promise<CanonicalResult> {
+    logger.debug('iot.resilient.execute', {
+      commandId: cmd.commandId,
+      timeoutMs: this.opts.timeoutMs,
+      maxAttempts: this.opts.retry.maxAttempts,
+    });
     return this.breaker.execute(() =>
       withRetry(
-        () => withTimeout(this.inner.execute(cmd), this.opts.timeoutMs),
+        () => {
+          logger.debug('iot.attempt', { commandId: cmd.commandId });
+          return withTimeout(this.inner.execute(cmd), this.opts.timeoutMs);
+        },
         this.opts.retry.maxAttempts,
         this.opts.retry.baseDelayMs,
       ),

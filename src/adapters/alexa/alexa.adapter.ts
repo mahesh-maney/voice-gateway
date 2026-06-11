@@ -5,6 +5,7 @@ import type { AlexaRequest, AlexaResponse, AlexaSlot } from './alexa.types.js';
 import { INTENT_TO_ACTION } from './alexa.intents.js';
 import { GatewayError, UnmappedIntentError } from '../../core/errors.js';
 import { uuid } from '../../util/text.js';
+import { logger } from '../../util/logger.js';
 
 const slotValue = (slots: Record<string, AlexaSlot> | undefined, name: string): string | undefined =>
   slots?.[name]?.value;
@@ -18,10 +19,22 @@ export class AlexaAdapter implements VoiceAdapter<AlexaRequest, AlexaResponse> {
   async toCanonical(req: AlexaRequest, ctx: AdapterContext): Promise<CanonicalCommand> {
     const r = req.request;
     const intentName = r.intent?.name;
+
+    logger.debug('alexa.intent.received', {
+      requestId: r.requestId,
+      intentName: intentName ?? r.type,
+      locale: r.locale,
+      deviceId: req.context.System.device?.deviceId,
+      timestamp: r.timestamp,
+    });
+
     if (!intentName) throw new UnmappedIntentError(r.type);
 
     const action = INTENT_TO_ACTION[intentName];
-    if (!action) throw new UnmappedIntentError(intentName);
+    if (!action) {
+      logger.warn('alexa.intent.unmapped', { intentName, requestId: r.requestId });
+      throw new UnmappedIntentError(intentName);
+    }
 
     // Account linking: token (or Alexa user id) -> our internal user id.
     const userId = await ctx.identity.resolveUserId({
@@ -33,6 +46,15 @@ export class AlexaAdapter implements VoiceAdapter<AlexaRequest, AlexaResponse> {
     const slots = r.intent?.slots;
     const locale = r.locale;
     const kind: CommandKind = action === 'appliance.query_state' ? 'query' : 'control';
+
+    logger.debug('alexa.slots.parsed', {
+      requestId: r.requestId,
+      action,
+      kind,
+      slots: slots
+        ? Object.fromEntries(Object.entries(slots).map(([k, v]) => [k, v.value]))
+        : {},
+    });
 
     return {
       version: '1.0',
@@ -90,11 +112,20 @@ export class AlexaAdapter implements VoiceAdapter<AlexaRequest, AlexaResponse> {
 
   toResponse(result: CanonicalResult, _opts: FormatOptions): AlexaResponse {
     const lead = result.status === 'success' ? 'Okay. ' : result.status === 'partial' ? 'Partly done. ' : 'Sorry. ';
+    logger.debug('alexa.response.built', {
+      commandId: result.commandId,
+      status: result.status,
+      summary: result.summary,
+    });
     return this.speak(lead + result.summary);
   }
 
   toErrorResponse(error: Error, _opts: FormatOptions): AlexaResponse {
     const message = error instanceof GatewayError ? error.userMessage : 'Sorry, something went wrong.';
+    logger.debug('alexa.error.response.built', {
+      errorType: error.constructor.name,
+      userMessage: message,
+    });
     return this.speak(message);
   }
 

@@ -11,6 +11,7 @@ import { requireApiKey } from './middleware/api-key.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { requestTimeout } from './middleware/timeout.js';
 import { registry, voiceRequestsTotal, voiceRequestDuration } from '../observability/metrics.js';
+import { logger } from '../util/logger.js';
 import { config } from '../config.js';
 
 /** Builds the Express app. One route per assistant; all share the gateway. */
@@ -135,18 +136,44 @@ async function handleVoice(
   locale: string,
 ): Promise<void> {
   const endTimer = voiceRequestDuration.startTimer({ platform });
+  const start = Date.now();
+
+  // Extract correlationId (platform's requestId) early for audit trail
+  const correlationId = (req.body as Record<string, unknown>)?.request;
+  const rid = (typeof correlationId === 'object' && correlationId !== null)
+    ? (correlationId as Record<string, unknown>)['requestId']
+    : undefined;
+
+  logger.info('voice.request.received', {
+    platform,
+    locale,
+    correlationId: typeof rid === 'string' ? rid : undefined,
+    ip: req.ip,
+    userAgent: req.headers['user-agent'],
+  });
+
   try {
     const response = await gateway.handle(platform, body, locale);
     voiceRequestsTotal.inc({ platform });
 
-    // Echo the platform's own request id back so callers can correlate logs.
-    const correlationId = (req.body as Record<string, unknown>)?.request;
-    if (typeof correlationId === 'object' && correlationId !== null) {
-      const rid = (correlationId as Record<string, unknown>)['requestId'];
-      if (typeof rid === 'string') res.setHeader('x-correlation-id', rid);
-    }
+    if (typeof rid === 'string') res.setHeader('x-correlation-id', rid);
+
+    logger.info('voice.request.completed', {
+      platform,
+      correlationId: typeof rid === 'string' ? rid : undefined,
+      durationMs: Date.now() - start,
+    });
 
     res.json(response);
+  } catch (err) {
+    logger.error('voice.request.unhandled', {
+      platform,
+      correlationId: typeof rid === 'string' ? rid : undefined,
+      error: (err as Error).message,
+      stack: (err as Error).stack,
+      durationMs: Date.now() - start,
+    });
+    throw err;
   } finally {
     endTimer();
   }

@@ -1,5 +1,6 @@
 import type { CanonicalResult } from '../domain/canonical-result.js';
 import type { Sql } from 'postgres';
+import { logger } from '../util/logger.js';
 
 /**
  * Idempotency log — records every command that has been executed so a
@@ -16,11 +17,14 @@ export class InMemoryCommandLog implements CommandLog {
   private readonly store = new Map<string, CanonicalResult>();
 
   async find(commandId: string): Promise<CanonicalResult | undefined> {
-    return this.store.get(commandId);
+    const hit = this.store.get(commandId);
+    logger.debug('commandLog.find', { commandId, hit: !!hit, store: 'memory' });
+    return hit;
   }
 
   async record(commandId: string, result: CanonicalResult): Promise<void> {
     this.store.set(commandId, result);
+    logger.debug('commandLog.record', { commandId, action: result.action, status: result.status, store: 'memory' });
   }
 }
 
@@ -32,7 +36,9 @@ export class PostgresCommandLog implements CommandLog {
     const rows = await this.sql<{ result: CanonicalResult }[]>`
       SELECT result FROM command_log WHERE command_id = ${commandId} LIMIT 1
     `;
-    return rows[0]?.result;
+    const hit = rows[0]?.result;
+    logger.debug('commandLog.find', { commandId, hit: !!hit, store: 'postgres' });
+    return hit;
   }
 
   async record(commandId: string, result: CanonicalResult): Promise<void> {
@@ -41,5 +47,6 @@ export class PostgresCommandLog implements CommandLog {
       VALUES (${commandId}, ${this.sql.json(result as never)})
       ON CONFLICT (command_id) DO NOTHING
     `;
+    logger.debug('commandLog.record', { commandId, action: result.action, status: result.status, store: 'postgres' });
   }
 }

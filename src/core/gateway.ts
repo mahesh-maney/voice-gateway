@@ -31,27 +31,59 @@ export class VoiceGateway {
     const adapter = this.adapters.get(platform);
     if (!adapter) throw new Error(`No adapter registered for platform "${platform}"`);
 
+    const pipelineStart = Date.now();
     try {
       const cmd = await adapter.toCanonical(req, { identity: this.identity });
       logger.info('command.parsed', {
-        correlationId: cmd.correlationId, action: cmd.action,
-        scene: cmd.target.spokenScene, appliance: cmd.target.spokenAppliance,
+        commandId: cmd.commandId,
+        correlationId: cmd.correlationId,
+        action: cmd.action,
+        kind: cmd.kind,
+        userId: cmd.actor.userId,
+        platform: cmd.source.platform,
+        locale: cmd.source.locale,
+        deviceId: cmd.source.surfaceDeviceId,
+        spokenScene: cmd.target.spokenScene,
+        spokenAppliance: cmd.target.spokenAppliance,
+        parameters: cmd.parameters,
       });
 
       await this.resolver.resolve(cmd);
       logger.info('command.resolved', {
+        commandId: cmd.commandId,
         correlationId: cmd.correlationId,
-        site: cmd.target.siteName, scene: cmd.target.sceneName,
+        userId: cmd.actor.userId,
+        siteId: cmd.target.siteId,
+        siteName: cmd.target.siteName,
+        sceneId: cmd.target.sceneId,
+        sceneName: cmd.target.sceneName,
         applianceIds: cmd.target.applianceIds,
       });
 
+      const dispatchStart = Date.now();
       const result = await this.dispatcher.dispatch(cmd);
-      logger.info('command.executed', { correlationId: cmd.correlationId, status: result.status });
+      logger.info('command.executed', {
+        commandId: cmd.commandId,
+        correlationId: cmd.correlationId,
+        userId: cmd.actor.userId,
+        action: cmd.action,
+        applianceIds: cmd.target.applianceIds,
+        status: result.status,
+        summary: result.summary,
+        dispatchMs: Date.now() - dispatchStart,
+        totalMs: Date.now() - pipelineStart,
+      });
 
       return adapter.toResponse(result, { locale });
     } catch (err) {
-      logger.warn('command.failed', { platform, error: (err as Error).message });
-      return adapter.toErrorResponse(err as Error, { locale });
+      const error = err as Error;
+      logger.warn('command.failed', {
+        platform,
+        errorType: error.constructor.name,
+        error: error.message,
+        totalMs: Date.now() - pipelineStart,
+      });
+      return adapter.toErrorResponse(error, { locale });
     }
   }
 }
